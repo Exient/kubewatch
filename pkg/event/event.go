@@ -31,6 +31,7 @@ type Event struct {
 	Reason    string
 	Status    string
 	Name      string
+	Object    interface{}
 }
 
 var m = map[string]string{
@@ -42,6 +43,7 @@ var m = map[string]string{
 // New create new KubewatchEvent
 func New(obj interface{}, action string) Event {
 	var namespace, kind, component, host, reason, status, name string
+	var object interface{}
 	if apiService, ok := obj.(*api.Service); ok {
 		namespace = apiService.ObjectMeta.Namespace
 		kind = "service"
@@ -49,6 +51,7 @@ func New(obj interface{}, action string) Event {
 		reason = action
 		status = m[action]
 		name = apiService.Name
+		object = apiService
 	} else if apiPod, ok := obj.(*api.Pod); ok {
 		namespace = apiPod.ObjectMeta.Namespace
 		kind = "pod"
@@ -56,12 +59,21 @@ func New(obj interface{}, action string) Event {
 		host = apiPod.Spec.NodeName
 		status = m[action]
 		name = apiPod.Name
+		object = apiPod
 	} else if apiRC, ok := obj.(*api.ReplicationController); ok {
 		name = apiRC.TypeMeta.Kind
 		kind = "replication controller"
 		reason = action
 		status = m[action]
 		name = apiRC.Name
+		object = apiRC
+	} else if apiEvent, ok := obj.(*api.Event); ok {
+		namespace = apiEvent.ObjectMeta.Namespace
+		kind = "event"
+		reason = action
+		status = m[action]
+		name = apiEvent.Name
+		object = apiEvent
 	}
 
 	kbEvent := Event{
@@ -72,6 +84,7 @@ func New(obj interface{}, action string) Event {
 		Reason:    reason,
 		Status:    status,
 		Name:      name,
+		Object:    object,
 	}
 
 	return kbEvent

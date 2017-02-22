@@ -57,6 +57,11 @@ func Controller(conf *config.Config, eventHandler handlers.Handler) {
 		rcStore = watchReplicationControllers(kubeClient, rcStore, eventHandler)
 	}
 
+	{
+		var eventStore cache.Store
+		watchEvents(kubeClient, eventStore, eventHandler)
+	}
+
 	logrus.Fatal(http.ListenAndServe(":8081", nil))
 }
 
@@ -120,6 +125,30 @@ func watchReplicationControllers(client *client.Client, store cache.Store, event
 		resyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    eventHandler.ObjectCreated,
+			DeleteFunc: eventHandler.ObjectDeleted,
+		},
+	)
+
+	//Run the controller as a goroutine
+	go eController.Run(wait.NeverStop)
+
+	return eStore
+}
+
+func watchEvents(client *client.Client, store cache.Store, eventHandler handlers.Handler) cache.Store {
+	//Define what we want to look for (events)
+	watchlist := cache.NewListWatchFromClient(client, "events", api.NamespaceAll, fields.Everything())
+
+	resyncPeriod := 30 * time.Minute
+
+	//Setup an informer to call functions when the watchlist changes
+	eStore, eController := framework.NewInformer(
+		watchlist,
+		&api.Event{},
+		resyncPeriod,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc:    eventHandler.ObjectCreated,
+			UpdateFunc: eventHandler.ObjectUpdated,
 			DeleteFunc: eventHandler.ObjectDeleted,
 		},
 	)
